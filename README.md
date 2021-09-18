@@ -153,12 +153,12 @@ No :ignore_warnings opt specified in mix.exs and default does not exist.
 Starting Dialyzer
 [
 check_plt: false,
-init_plt: '/home/todd/code/fast_raduis_test/stl_parser/_build/dev/dialyxir_erlang-22.0.7_elixir-1.9.1_deps-dev.plt',
-files: ['/home/todd/code/fast_raduis_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.Mix.Tasks.Parse.beam',
-'/home/todd/code/fast_raduis_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.StlAnalyzer.Application.beam',
-'/home/todd/code/fast_raduis_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.StlAnalyzer.Calculations.beam',
-'/home/todd/code/fast_raduis_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.StlAnalyzer.Facet.beam',
-'/home/todd/code/fast_raduis_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.StlAnalyzer.File.beam',
+init_plt: '/home/todd/code/_test/stl_parser/_build/dev/dialyxir_erlang-22.0.7_elixir-1.9.1_deps-dev.plt',
+files: ['/home/todd/code/_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.Mix.Tasks.Parse.beam',
+'/home/todd/code/_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.StlAnalyzer.Application.beam',
+'/home/todd/code/_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.StlAnalyzer.Calculations.beam',
+'/home/todd/code/_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.StlAnalyzer.Facet.beam',
+'/home/todd/code/_test/stl_parser/_build/dev/lib/stl_analyzer/ebin/Elixir.StlAnalyzer.File.beam',
 ...],
 warnings: [:unmatched_returns, :error_handling, :race_conditions, :no_opaque,
 ...]
