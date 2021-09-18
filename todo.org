@@ -1,0 +1,207 @@
+# Arch
+* I want to use layers like HAQT to keep things clean and modular
+** * - Handler: CLI, File, API, ???
+** A - Action: Parse |> Calculate
+** Q - Query: ??? not sure what falls under Query layer
+** T - Transform: ??? View Layer :: CLI, File, JSON
+* I am thinking of this as one data flow
+** get file data incoming from a handler
+** parse into data structure
+** run workers returning updated version of data structure
+** pass resulting data structure through view layer
+* For this HAQT does not seem to be 100% fit possibly something hybrid is needed
+* The Handler and the View Layer need to line up and have some knowledge that the middle layers do not need to know about.
+** The Handler should be the one to pass data to the view and choose what view to call
+* After more decomp and consideration this looks like it fits the worker-bee better
+* Do Fun Things with Big, Loud Worker-Bees
+** Data  # data structures
+** Functoinal Core
+** Testing # of course must alway test all the things
+** Boundaries # API layer
+** Lifecycles # supervision
+** Workers
+
+# DATA
+** TODO - Solid data structure
+** contains many facets :: [] and a solid name :: String.t()
+* TODO - Facet data structure
+** Normals :: {nx, ny, nz} # do the normals alter the calculations at all?
+** Vertices :: %{a: {x, y, z}, b: {x, y, z}, c: {x, y, z}}
+** Surface Area :: float()
+* TODO - metadata for structure
+** TODO - calculations %{ accum_surface_area: float(), bounding_box: bounding_box() }
+** TODO - lower bound vertex and upper bound vertex
+** TODO - timestamps
+```
+      %{
+        task_recieved: tr,
+        file_read_completed: frc,
+        parse_completed: pc,
+        calculations: %{
+          number_completed: nc,
+          surface_area_completed: sac,
+          bounding_completed: bc,
+          completed: ac
+        }
+      }
+```
+
+# FUNCTIONAL CORE
+* TODO - Parse into system
+** TODO - parser module that creates data structures from file string/stream data
+** NOTES 
+```
+      at this stage and looking at the file format and what File.stream
+      returns me it seems like maybe I should be looking into lexing and parsing w/
+      leex and yecc to catch on the solid/endsolid and facet/endfacet
+      loop/endloop parts
+      breaking this up by line ending doesn't give me an easy starting point
+      as it is tricky to find the next stop and then the begining of the next
+      with neseted data like this.
+      It is kind of like matching up do/end blocks in Elixir itself,
+      in which a Lexer and Parser are used for that. Seems like a good
+      example to follow.
+
+      I am not sure if I can utilize the streaming and lazy enumeration this
+      way, it would be nice. I don't think the Elixir Lexing and Parser
+      streams in Elixir files ( I should check to be 100% sure ).
+      https://github.com/elixir-lang/elixir/blob/master/lib/elixir/src/elixir_tokenizer.erl
+      https://github.com/elixir-lang/elixir/blob/master/lib/elixir/src/elixir_parser.yrl
+
+      This may be a little overkill for this but seems like a fit for the
+      problem, going to do some more research and play around with leex and
+      yecc more to see how it feels.
+
+      To start I would like to define what a lexed and parsed output looks
+      like before it would be used to create data structures in the
+      application.
+      I think these should be the simplest data structures I can use to
+      represent the incoming information.
+
+      I think the most important information is how the different blocks are
+      nested 
+      """
+      solid -> facet -> loop |vertices| <- endloop <- endfacet <- endsolid
+      """
+```
+* TODO - Calculate Metrics
+** TODO - Calculate Number of trianlges
+*** This could probably be a counter that gets triggered on every facet parse/creation
+** TODO - Calculate Surface Area
+*** I wonder if this can simply be the accum of each facets surface areas
+*** if so just calc and accum as facet is created
+```
+      @type vertex() :: {integer, integer, integer}
+      @spec fn (vertex(), vertex(), vertex() :: float()
+      fn {x, y, z}=v1, {x, y, z}=v2, {x, y, z}=v3 -> 0.707106781
+```
+*** Found a formula for calculating area of triangle given 3 sets of vertices
+```
+      A = 1/2 | (v3 - v1) = v1v3-> X (v3 - v2) = v1v2-> |
+            |  i  j  k |
+      v1v3->| x1 y1 z1 |
+      v1v2->| x2 y2 z2 |
+      cx = (y1*z2 - y2*z1)
+      cy = (x1*z2 - x2*z1)
+      cz = (x1*y2 - x2*y1)
+      C = cx^2 + cy^2 + cz^2
+      pgram_a = 2V|C|   # square root of absolute value of C
+      tri_a = pgram_a / 2
+```
+**** The example triangles together should accum to   1.4142
+*** using this  with the first triangle got 1.414213562 / 2
+*** also seems like if you end up with a negative before root to get pgram area then take abs value
+*** Best example I found outside of Udemy
+**** https://math.stackexchange.com/questions/128991/how-to-calculate-the-area-of-a-3d-triangle
+*** TODO - To what decimal place is considered acceptable for surface area 4?
+** TODO - Calculate Bounding Box
+*** Seems like this could maybe be done by keeping track of the min and max vertex values for {x, y, z}
+*** as the parsing is being done
+**** This would be the lower and upper values for each x, y and z seperately not the vertex with the lowest ??
+```
+      @type vertex() :: {integer, integer, integer}
+      @spec fn (vertex(), vertex()) :: vertex()
+      fn {lx, ly, lz} = lv, {x, y, z} ->
+          if none from x, y, z are lower return lv
+          any that are lower replace with the corresponding value
+          and return the updated verion of lv
+```
+*** stash min and max somewhere till end of parse.
+*** then on calc build bounding box from min max values
+*** Using Lower Bound and Upper Bound instead of Min/Max
+```
+      @type vertex() :: {integer, integer, integer}
+      @type bounding_box() :: [vertex(), vertex(), vertex(), vertex(),
+      vertex(), vertex(), vertex(), vertex()]
+
+      @spec fn (vertex(), vertex()) :: bounding_box()
+      fn {lx, ly, lz}, {ux, uy, uz} -> [
+       {ux, ly, lz}, {ux, ly, uz},
+       {lx, ly, lz}, {lx, ly, uz},
+       {ux, uy, lz}, {ux, uy, uz},
+       {lx, uy, lz}, {lx, uy, uz}
+       ] end
+```
+  This returns all possible combinations from the given tuples
+  I wonder if there is something that already does this as a function?
+  Found some intersting ways to do combinations but after some thought
+  this would be faster as a hard coded return value and since the tuples are
+  not dynamic and will always be {1, 2, 3} & {1, 2, 3} this should be the
+  best solution.
+
+# TESTING
+* TODO - start with test around outer parser module to return expected output
+* TODO - test inward as more of functional core develops
+* TODO - add perf tests using larger files from inet after complete
+** Use stegosaurus pick holder stl file
+* TODO - test if your solution could handle a model with millions of triangles
+** Try stegosaurus pick holder stl file, not sure how many triangles yet
+
+# BOUNDARIES
+* TODO CLI Input Layer
+** TODO - mix task that take file name from cli
+** TODO - a file reader (helper) that takes filename and reads file in
+*** If this needed to support something other that cli in the future like api then this will help keep it clean
+* TODO CLI Output Layer
+** TODO - use view layer to parse data to match output for cli so other views could be used like json api
+** TODO -
+```
+Number of Triangles: 2
+Surface Area: 1.4142
+Bounding Box: {x: 0, y: 0, z: 0 }, {x: 1, y: 1, z: 1 } ...
+
+...
+➜ fast_raduis_test/stl_parser ➤ a4a1e98|master⚡
+± mix parse simple_solid.stl                                                                                                                                                                              ⏎ [6h] ✹ ✭
+Number of Triangles: 2
+Surface Area: 1.4142135623730951
+Bounding Box: [{1.0, 0.0, 0.0}, {1.0, 0.0, 1.0}, {0.0, 0.0, 0.0}, {0.0, 0.0, 1.0}, {1.0, 1.0, 0.0}, {1.0, 1.0, 1.0}, {0.0, 1.0, 0.0}, {0.0, 1.0, 1.0}]
+➜ fast_raduis_test/stl_parser ➤ a4a1e98|master⚡
+± mix parse StegosaurusPickHolder-Tortex-1.0mm.stl                                                                                                                                                          [6h] ✹ ✭
+Number of Triangles: 1526
+Surface Area: 16934.070758016467
+Bounding Box: [{37.6439, -77.915, -22.8505}, {37.6439, -77.915, 20.5809}, {-41.1915, -77.915, -22.8505}, {-41.1915, -77.915, 20.5809}, {37.6439, 77.0365, -22.8505}, {37.6439, 77.0365, 20.5809}, {-41.1915, 77.0365,-22.8505}, {-41.1915, 77.0365, 20.5809}]
+➜ fast_raduis_test/stl_parser ➤ a4a1e98|master⚡
+± mix parse DalekBig.stl                                                                                                                                                                                    [6h] ✹ ✭
+Number of Triangles: 43710
+Surface Area: 122217.99193856966
+Bounding Box: [{125.904, -61.0429, -3.30336e-30}, {125.904, -61.0429, 110.0}, {-122.921, -61.0429, -3.30336e-30}, {-122.921, -61.0429, 110.0}, {125.904, 61.0429, -3.30336e-30}, {125.904, 61.0429, 110.0}, {-122.921, 61.0429, -3.30336e-30}, {-122.921, 61.0429, 110.0}]
+➜ fast_raduis_test/stl_parser ➤ a4a1e98|master⚡
+± mix parse affine_spiral.stl                                                                                                                                                                               [6h] ✹ ✭
+Number of Triangles: 179460
+Surface Area: 434551.53915101633
+Bounding Box: [{64.0, -33.762553, 0.0}, {64.0, -33.762553, 25.142857}, {-63.75731, -33.762553, 0.0}, {-63.75731, -33.762553, 25.142857}, {64.0, 65.144394, 0.0}, {64.0, 65.144394, 25.142857}, {-63.75731, 65.144394,0.0}, {-63.75731, 65.144394, 25.142857}]
+➜ fast_raduis_test/stl_parser ➤ a4a1e98|master⚡
+± mix parse groot_body_high_detail-ascii.stl                                                                                                                                                                [6h] ✹ ✭
+Number of Triangles: 3295832
+Surface Area: 32076.890739517086
+Bounding Box: [{147.7683, -1.12045e-6, 0.0}, {147.7683, -1.12045e-6, 93.51709}, {-8.573206e-7, -1.12045e-6, 0.0}, {-8.573206e-7, -1.12045e-6, 93.51709}, {147.7683, 65.77018, 0.0}, {147.7683, 65.77018, 93.51709}, {-8.573206e-7, 65.77018, 0.0}, {-8.573206e-7, 65.77018, 93.51709}]
+```
+
+# Lifecycle / Workers
+* TODO - possible opportunities to parallel work
+** file could be read in  / worked as stream
+** each facet could be parsed in parallel
+*** TODO - do facets need to remain in order read?
+** number of triangles accum could be collected during facet parsing and added to data structure
+
